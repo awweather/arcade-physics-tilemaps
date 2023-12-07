@@ -1,32 +1,38 @@
+//@ts-nocheck
 /**
  * @author       Richard Davey <rich@photonstorm.com>
  * @copyright    2020 Photon Storm Ltd.
  * @license      {@link https://opensource.org/licenses/MIT|MIT License}
  */
 
-import AngleBetweenPoints from '../../math/angle/BetweenPoints'
-import Clamp from '../../math/Clamp'
-import DistanceBetween from '../../math/distance/DistanceBetween'
 import EventEmitter from 'eventemitter3'
-import Events from './events'
+import { Rectangle } from '../../geom/rectangle/Rectangle'
+import Clamp from '../../math/Clamp'
+import { Vector2 } from '../../math/Vector2'
+import Wrap from '../../math/Wrap'
+import AngleBetweenPoints from '../../math/angle/BetweenPoints'
+import MATH_CONST from '../../math/const'
+import DistanceBetween from '../../math/distance/DistanceBetween'
 import FuzzyEqual from '../../math/fuzzy/Equal'
 import FuzzyGreaterThan from '../../math/fuzzy/GreaterThan'
 import FuzzyLessThan from '../../math/fuzzy/LessThan'
-import { GetOverlapX } from './GetOverlapX'
-import { GetOverlapY } from './GetOverlapY'
-import GetValue from '../../utils/object/GetValue'
+import { ProcessQueue } from '../../structs/ProcessQueue'
 import RTree from '../../structs/RTree'
-import { Rectangle } from '../../geom/rectangle/Rectangle'
-import { SeparateX } from './SeparateX'
-import { SeparateY } from './SeparateY'
-import Wrap from '../../math/Wrap'
-import CONST from './const'
-import MATH_CONST from '../../math/const'
-import { StaticBody } from './StaticBody'
+import TilemapLayer from '../../tilemaps/TilemapLayer.js'
+import GetTilesWithinWorldXY from '../../tilemaps/components/GetTilesWithinWorldXY.js'
+import GetValue from '../../utils/object/GetValue'
 import { Body } from './Body'
 import { Collider } from './Collider'
-import { ProcessQueue } from '../../structs/ProcessQueue'
-import { Vector2 } from '../../math/Vector2'
+import { GetOverlapX } from './GetOverlapX'
+import { GetOverlapY } from './GetOverlapY'
+import { SeparateX } from './SeparateX'
+import { SeparateY } from './SeparateY'
+import { StaticBody } from './StaticBody'
+import CONST from './const'
+import Events from './events'
+import ProcessTileCallbacks from './tilemap/ProcessTileCallbacks.js'
+import SeparateTile from './tilemap/SeparateTile.js'
+import TileIntersectsBody from './tilemap/TileIntersectsBody.js'
 import type {
   ArcadePhysicsCallback,
   ArcadeProcessCallback,
@@ -1624,8 +1630,8 @@ export class World extends EventEmitter {
    * @return {boolean} True if any objects overlap (with `overlapOnly`); or true if any overlapping objects were separated.
    */
   collideHandler(
-    body1: Body | StaticBody,
-    body2: Body | StaticBody,
+    body1: Body | (StaticBody & TilemapLayer),
+    body2: Body | (StaticBody & TilemapLayer),
     collideCallback?: ArcadePhysicsCallback,
     processCallback?: ArcadeProcessCallback,
     callbackContext?: any,
@@ -1646,25 +1652,23 @@ export class World extends EventEmitter {
     }
 
     //  A Body
-    /*if (body1.body) {
-      if (body2.body) {
-        return this.collideSpriteVsSprite(body1, body2, collideCallback, processCallback, callbackContext, overlapOnly)
-      } else if (body2.isParent) {
-        return this.collideSpriteVsGroup(body1, body2, collideCallback, processCallback, callbackContext, overlapOnly)
-      } else if (body2.isTilemap) {
+    if (body1) {
+      if (body2.isTilemap) {
         return this.collideSpriteVsTilemapLayer(
-          body1,
+          { body: body1 },
           body2,
           collideCallback,
           processCallback,
           callbackContext,
           overlapOnly
         )
+      } else if (body2.isParent) {
+        // return this.collideSpriteVsGroup(body1, body2, collideCallback, processCallback, callbackContext, overlapOnly)
       }
-    }*/
+    }
 
     //  GROUPS
-    /*else if (body1.isParent) {
+    else if (body1.isParent) {
       if (body2.body) {
         return this.collideSpriteVsGroup(body2, body1, collideCallback, processCallback, callbackContext, overlapOnly)
       } else if (body2.isParent) {
@@ -1679,10 +1683,10 @@ export class World extends EventEmitter {
           overlapOnly
         )
       }
-    }*/
+    }
 
     //  TILEMAP LAYERS
-    /*else if (body1.isTilemap) {
+    else if (body1.isTilemap) {
       if (body2.body) {
         return this.collideSpriteVsTilemapLayer(
           body2,
@@ -1702,7 +1706,7 @@ export class World extends EventEmitter {
           overlapOnly
         )
       }
-    }*/
+    }
   }
 
   /**
@@ -1722,25 +1726,25 @@ export class World extends EventEmitter {
    *
    * @return {boolean} True if any objects overlap (with `overlapOnly`); or true if any overlapping objects were separated.
    */
-  // collideSpriteVsSprite(sprite1, sprite2, collideCallback, processCallback, callbackContext, overlapOnly) {
-  //   if (!sprite1.body || !sprite2.body) {
-  //     return false
-  //   }
+  collideSpriteVsSprite(sprite1, sprite2, collideCallback, processCallback, callbackContext, overlapOnly) {
+    if (!sprite1.body || !sprite2.body) {
+      return false
+    }
 
-  //   if (this.separate(sprite1.body, sprite2.body, processCallback, callbackContext, overlapOnly)) {
-  //     if (collideCallback) {
-  //       collideCallback.call(callbackContext, sprite1, sprite2)
-  //     }
+    if (this.separate(sprite1.body, sprite2.body, processCallback, callbackContext, overlapOnly)) {
+      if (collideCallback) {
+        collideCallback.call(callbackContext, sprite1, sprite2)
+      }
 
-  //     this._total++
-  //   }
+      this._total++
+    }
 
-  //   return true
-  // }
+    return true
+  }
 
   collideBodyVsBody(
-    body1: Body | StaticBody,
-    body2: Body | StaticBody,
+    body1: Body | (StaticBody & TilemapLayer),
+    body2: Body | (StaticBody & TilemapLayer),
     collideCallback?: ArcadePhysicsCallback,
     processCallback?: ArcadeProcessCallback,
     callbackContext?: any,
@@ -1861,30 +1865,30 @@ export class World extends EventEmitter {
    *
    * @return {boolean} True if any objects overlap (with `overlapOnly`); or true if any overlapping objects were separated.
    */
-  // collideGroupVsTilemapLayer(group, tilemapLayer, collideCallback, processCallback, callbackContext, overlapOnly) {
-  // let children = group.getChildren()
-  // if (children.length === 0) {
-  //   return false
-  // }
-  // let didCollide = false
-  // for (let i = 0; i < children.length; i++) {
-  //   if (children[i].body) {
-  //     if (
-  //       this.collideSpriteVsTilemapLayer(
-  //         children[i],
-  //         tilemapLayer,
-  //         collideCallback,
-  //         processCallback,
-  //         callbackContext,
-  //         overlapOnly
-  //       )
-  //     ) {
-  //       didCollide = true
-  //     }
-  //   }
-  // }
-  // return didCollide
-  // }
+  collideGroupVsTilemapLayer(group, tilemapLayer, collideCallback, processCallback, callbackContext, overlapOnly) {
+    const children = group.getChildren()
+    if (children.length === 0) {
+      return false
+    }
+    let didCollide = false
+    for (let i = 0; i < children.length; i++) {
+      if (children[i].body) {
+        if (
+          this.collideSpriteVsTilemapLayer(
+            children[i],
+            tilemapLayer,
+            collideCallback,
+            processCallback,
+            callbackContext,
+            overlapOnly
+          )
+        ) {
+          didCollide = true
+        }
+      }
+    }
+    return didCollide
+  }
 
   /**
    * This advanced method is specifically for testing for collision between a single Sprite and an array of Tile objects.
@@ -1914,21 +1918,21 @@ export class World extends EventEmitter {
    *
    * @return {boolean} True if any objects overlap (with `overlapOnly`); or true if any overlapping objects were separated.
    */
-  // collideTiles(sprite, tiles, collideCallback, processCallback, callbackContext) {
-  // if (!sprite.body.enable || tiles.length === 0) {
-  //   return false
-  // } else {
-  //   return this.collideSpriteVsTilesHandler(
-  //     sprite,
-  //     tiles,
-  //     collideCallback,
-  //     processCallback,
-  //     callbackContext,
-  //     false,
-  //     false
-  //   )
-  // }
-  // }
+  collideTiles(sprite, tiles, collideCallback, processCallback, callbackContext) {
+    if (!sprite.body.enable || tiles.length === 0) {
+      return false
+    } else {
+      return this.collideSpriteVsTilesHandler(
+        sprite,
+        tiles,
+        collideCallback,
+        processCallback,
+        callbackContext,
+        false,
+        false
+      )
+    }
+  }
 
   /**
    * This advanced method is specifically for testing for overlaps between a single Sprite and an array of Tile objects.
@@ -1987,42 +1991,42 @@ export class World extends EventEmitter {
    *
    * @return {boolean} True if any objects overlap (with `overlapOnly`); or true if any overlapping objects were separated.
    */
-  // collideSpriteVsTilemapLayer(sprite, tilemapLayer, collideCallback, processCallback, callbackContext, overlapOnly) {
-  // let body = sprite.body
-  // if (!body.enable || body.checkCollision.none) {
-  //   return false
-  // }
-  // let x = body.position.x
-  // let y = body.position.y
-  // let w = body.width
-  // let h = body.height
-  // let layerData = tilemapLayer.layer
-  // if (layerData.tileWidth > layerData.baseTileWidth) {
-  //   // The x origin of a tile is the left side, so x and width need to be adjusted.
-  //   let xDiff = (layerData.tileWidth - layerData.baseTileWidth) * tilemapLayer.scaleX
-  //   x -= xDiff
-  //   w += xDiff
-  // }
-  // if (layerData.tileHeight > layerData.baseTileHeight) {
-  //   // The y origin of a tile is the bottom side, so just the height needs to be adjusted.
-  //   let yDiff = (layerData.tileHeight - layerData.baseTileHeight) * tilemapLayer.scaleY
-  //   h += yDiff
-  // }
-  // let mapData = GetTilesWithinWorldXY(x, y, w, h, null, tilemapLayer.scene.cameras.main, tilemapLayer.layer)
-  // if (mapData.length === 0) {
-  //   return false
-  // } else {
-  //   return this.collideSpriteVsTilesHandler(
-  //     sprite,
-  //     mapData,
-  //     collideCallback,
-  //     processCallback,
-  //     callbackContext,
-  //     overlapOnly,
-  //     true
-  //   )
-  // }
-  // }
+  collideSpriteVsTilemapLayer(sprite, tilemapLayer, collideCallback, processCallback, callbackContext, overlapOnly) {
+    const body = sprite.body
+    if (!body.enable || body.checkCollision.none) {
+      return false
+    }
+    let x = body.position.x
+    const y = body.position.y
+    let w = body.width
+    let h = body.height
+    const layerData = tilemapLayer.layer
+    if (layerData.tileWidth > layerData.baseTileWidth) {
+      // The x origin of a tile is the left side, so x and width need to be adjusted.
+      const xDiff = (layerData.tileWidth - layerData.baseTileWidth) * tilemapLayer.scaleX
+      x -= xDiff
+      w += xDiff
+    }
+    if (layerData.tileHeight > layerData.baseTileHeight) {
+      // The y origin of a tile is the bottom side, so just the height needs to be adjusted.
+      const yDiff = (layerData.tileHeight - layerData.baseTileHeight) * tilemapLayer.scaleY
+      h += yDiff
+    }
+    const mapData = GetTilesWithinWorldXY(x, y, w, h, tilemapLayer.layer)
+    if (mapData.length === 0) {
+      return false
+    } else {
+      return this.collideSpriteVsTilesHandler(
+        sprite,
+        mapData,
+        collideCallback,
+        processCallback,
+        callbackContext,
+        overlapOnly,
+        true
+      )
+    }
+  }
 
   /**
    * Internal handler for Sprite vs. Tilemap collisions.
@@ -2044,45 +2048,45 @@ export class World extends EventEmitter {
    *
    * @return {boolean} True if any objects overlap (with `overlapOnly`); or true if any overlapping objects were separated.
    */
-  // collideSpriteVsTilesHandler(sprite, tiles, collideCallback, processCallback, callbackContext, overlapOnly, isLayer) {
-  //   let body = sprite.body
-  //   let tile
-  //   let tileWorldRect = { left: 0, right: 0, top: 0, bottom: 0 }
-  //   let tilemapLayer
-  //   let collision = false
-  //   for (let i = 0; i < tiles.length; i++) {
-  //     tile = tiles[i]
-  //     tilemapLayer = tile.tilemapLayer
-  //     let point = tilemapLayer.tileToWorldXY(tile.x, tile.y)
-  //     tileWorldRect.left = point.x
-  //     tileWorldRect.top = point.y
-  //     //  If the maps base tile size differs from the layer tile size, only the top of the rect
-  //     //  needs to be adjusted since its origin is (0, 1).
-  //     if (tile.baseHeight !== tile.height) {
-  //       tileWorldRect.top -= (tile.height - tile.baseHeight) * tilemapLayer.scaleY
-  //     }
-  //     tileWorldRect.right = tileWorldRect.left + tile.width * tilemapLayer.scaleX
-  //     tileWorldRect.bottom = tileWorldRect.top + tile.height * tilemapLayer.scaleY
-  //     if (
-  //       TileIntersectsBody(tileWorldRect, body) &&
-  //       (!processCallback || processCallback.call(callbackContext, sprite, tile)) &&
-  //       ProcessTileCallbacks(tile, sprite) &&
-  //       (overlapOnly || SeparateTile(i, body, tile, tileWorldRect, tilemapLayer, this.TILE_BIAS, isLayer))
-  //     ) {
-  //       this._total++
-  //       collision = true
-  //       if (collideCallback) {
-  //         collideCallback.call(callbackContext, sprite, tile)
-  //       }
-  //       if (overlapOnly && body.onOverlap) {
-  //         this.emit(Events.TILE_OVERLAP, sprite, tile, body)
-  //       } else if (body.onCollide) {
-  //         this.emit(Events.TILE_COLLIDE, sprite, tile, body)
-  //       }
-  //     }
-  //   }
-  //   return collision
-  // }
+  collideSpriteVsTilesHandler(sprite, tiles, collideCallback, processCallback, callbackContext, overlapOnly, isLayer) {
+    const body = sprite.body
+    let tile
+    const tileWorldRect = { left: 0, right: 0, top: 0, bottom: 0 }
+    let tilemapLayer
+    let collision = false
+    for (let i = 0; i < tiles.length; i++) {
+      tile = tiles[i]
+      tilemapLayer = tile.tilemapLayer
+      const point = tilemapLayer.tileToWorldXY(tile.x, tile.y)
+      tileWorldRect.left = point.x
+      tileWorldRect.top = point.y
+      //  If the maps base tile size differs from the layer tile size, only the top of the rect
+      //  needs to be adjusted since its origin is (0, 1).
+      if (tile.baseHeight !== tile.height) {
+        tileWorldRect.top -= (tile.height - tile.baseHeight) * tilemapLayer.scaleY
+      }
+      tileWorldRect.right = tileWorldRect.left + tile.width * tilemapLayer.scaleX
+      tileWorldRect.bottom = tileWorldRect.top + tile.height * tilemapLayer.scaleY
+      if (
+        TileIntersectsBody(tileWorldRect, body) &&
+        (!processCallback || processCallback.call(callbackContext, sprite, tile)) &&
+        ProcessTileCallbacks(tile, sprite) &&
+        (overlapOnly || SeparateTile(i, body, tile, tileWorldRect, tilemapLayer, this.TILE_BIAS, isLayer))
+      ) {
+        this._total++
+        collision = true
+        if (collideCallback) {
+          collideCallback.call(callbackContext, sprite, tile)
+        }
+        if (overlapOnly && body.onOverlap) {
+          this.emit(Events.TILE_OVERLAP, sprite, tile, body)
+        } else if (body.onCollide) {
+          this.emit(Events.TILE_COLLIDE, sprite, tile, body)
+        }
+      }
+    }
+    return collision
+  }
 
   /**
    * Internal helper for Group vs. Group collisions.

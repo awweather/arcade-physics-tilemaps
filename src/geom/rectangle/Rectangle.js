@@ -6,10 +6,10 @@
 
 import Contains from './Contains'
 
-import GetPoint from './GetPoint'
-import GetPoints from './GetPoints'
 import GEOM_CONST from '../const'
 import Line from '../line/Line'
+import GetPoint from './GetPoint'
+import GetPoints from './GetPoints'
 import Random from './Random'
 
 /**
