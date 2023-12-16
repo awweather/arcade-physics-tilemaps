@@ -4,6 +4,8 @@
 import ImageCollection from './ImageCollection.js'
 import TilemapLayer from './TilemapLayer.js'
 import Tileset from './Tileset.js'
+import getTileAt from './components/GetTileAt.js'
+import hasTileAt from './components/HasTileAt.js'
 import TileToWorldXY from './components/TileToWorldXY.js'
 import WorldToTileXY from './components/WorldToTileXY.js'
 import LayerData from './mapdata/LayerData.js'
@@ -359,5 +361,55 @@ export default class Tilemap {
     }
 
     return this._convert.TileToWorldXY(tileX, tileY, vec2, layer)
+  }
+
+  /**
+   * Checks if there is a tile at the given location (in tile coordinates) in the given layer. Returns
+   * false if there is no tile or if the tile at that location has an index of -1.
+   *
+   * If no layer is specified, the maps current layer is used.
+   *
+   * @method Phaser.Tilemaps.Tilemap#hasTileAt
+   * @since 3.0.0
+   *
+   * @param {number} tileX - The x coordinate, in tiles, not pixels.
+   * @param {number} tileY - The y coordinate, in tiles, not pixels.
+   * @param {(string|number|Phaser.Tilemaps.TilemapLayer)} [layer] - The tile layer to use. If not given the current layer is used.
+   *
+   * @return {?boolean} Returns a boolean, or null if the layer given was invalid.
+   */
+  hasTileAt(tileX: number, tileY: number, layer: string | number | TilemapLayer) {
+    layer = this.getLayer(layer)
+
+    if (layer === null) {
+      return null
+    }
+
+    return hasTileAt(tileX, tileY, layer)
+  }
+
+  /**
+   * Gets a tile at the given tile coordinates from the given layer.
+   *
+   * If no layer is specified, the maps current layer is used.
+   *
+   * @method Phaser.Tilemaps.Tilemap#getTileAt
+   * @since 3.0.0
+   *
+   * @param {number} tileX - X position to get the tile from (given in tile units, not pixels).
+   * @param {number} tileY - Y position to get the tile from (given in tile units, not pixels).
+   * @param {boolean} [nonNull] - If true getTile won't return null for empty tiles, but a Tile object with an index of -1.
+   * @param {(string|number|Phaser.Tilemaps.TilemapLayer)} [layer] - The tile layer to use. If not given the current layer is used.
+   *
+   * @return {?Phaser.Tilemaps.Tile} Returns a Tile, or null if the layer given was invalid.
+   */
+  getTileAt(tileX: number, tileY: number, nonNull, layer: string | number | TilemapLayer) {
+    layer = this.getLayer(layer)
+
+    if (layer === null) {
+      return null
+    }
+
+    return getTileAt(tileX, tileY, nonNull, layer)
   }
 }

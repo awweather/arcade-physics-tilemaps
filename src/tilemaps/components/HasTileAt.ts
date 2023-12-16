@@ -4,7 +4,7 @@
  * @license      {@link https://opensource.org/licenses/MIT|MIT License}
  */
 
-var IsInLayerBounds = require('./IsInLayerBounds');
+import IsInLayerBounds from './IsInLayerBounds.js'
 
 /**
  * Checks if there is a tile at the given location (in tile coordinates) in the given layer. Returns
@@ -19,18 +19,13 @@ var IsInLayerBounds = require('./IsInLayerBounds');
  *
  * @return {?boolean} Returns a boolean, or null if the layer given was invalid.
  */
-var HasTileAt = function (tileX, tileY, layer)
-{
-    if (IsInLayerBounds(tileX, tileY, layer))
-    {
-        var tile = layer.data[tileY][tileX];
+var HasTileAt = function (tileX, tileY, layer) {
+  if (IsInLayerBounds(tileX, tileY, layer)) {
+    var tile = layer.data[tileY][tileX]
 
-        return (tile !== null && tile.index > -1);
-    }
-    else
-    {
-        return false;
-    }
-};
-
-module.exports = HasTileAt;
+    return tile !== null && tile.index > -1
+  } else {
+    return false
+  }
+}
+export default HasTileAt

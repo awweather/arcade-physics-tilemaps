@@ -5,3 +5,5 @@
  */
 
 export { ArcadePhysics } from './physics/arcade/ArcadePhysics'
+export { ParseToTilemaps }
+import ParseToTilemaps from './tilemaps/ParseToTilemap'

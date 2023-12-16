@@ -9,5 +9,6 @@
  */
 
 module.exports = {
-  CalculateFacesOut: require('./CalculateFacesAt.js')
+  CalculateFacesOut: require('./CalculateFacesAt.js'),
+  HasTileAt: require('./HasTileAt.js')
 }
